@@ -22,15 +22,15 @@
 |----------|--------------------|-------------------|-------------------------|
 | 1. Progression joueurs | NBA Stats API, Basketball Reference, Kaggle | API (JSON), CSV | Saison/Année |
 | 2. Facteurs de victoire | NBA Stats API, ESPN, Kaggle | API (JSON), CSV | Match/Jour |
-| 3. Blessures | Basketball Reference, ESPN, SportsRadar | CSV, API (JSON/XML) | Match/Semaine |
+| 3. Blessures | ESPN | CSV, API (JSON/XML) | Match/Semaine |
 | 4. Matchs spectaculaires | NBA Stats API, Kaggle | API (JSON), CSV | Match/Jour |
-| 6. Joueurs décisifs | NBA Stats API, Basketball Reference | API (JSON), CSV | Match/Jour |
+| 6. Joueurs décisifs | NBA Stats API | API (JSON), CSV | Match/Jour |
 | 8. Statistique rookies | NBA Stats API, Kaggle | API (JSON), CSV | Saison/Année |
-| 9. Géographie des matchs | NBA Stats API, Basketball Reference | API (JSON), CSV | Match/Jour |
-| 10. Affluence salles | NBA Stats API, Data.world | CSV, API (JSON) | Saison/Année |
-| 12. Records | NBA Stats API, Basketball Reference | API (JSON), CSV | Saison/Année |
-| 13. Stats avancées & palmarès | Basketball Reference, Kaggle | CSV, API (JSON) | Saison/Année |
-| 14. Salaires | Hoopshype, Basketball Reference, Kaggle | CSV, API (JSON) | Saison/Année |
+| 9. Géographie des matchs | NBA Stats API | API (JSON), CSV | Match/Jour |
+| 10. Affluence salles | NBA Stats API | CSV, API (JSON) | Saison/Année |
+| 12. Records | NBA Stats API | API (JSON), CSV | Saison/Année |
+| 13. Stats avancées & palmarès | Kaggle | CSV, API (JSON) | Saison/Année |
+| 14. Salaires | Hoopshype, Kaggle | CSV, API (JSON) | Saison/Année |
 
 ---
 
