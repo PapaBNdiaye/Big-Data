@@ -37,6 +37,16 @@ class NBADataCollector:
     """Collecteur principal de données NBA pour DataLake"""
     
     def __init__(self, output_dir: str = 'data'):
+        # Import de la configuration
+        import sys
+        import os
+        # Ajouter le répertoire racine au path pour trouver config.py
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        if root_dir not in sys.path:
+            sys.path.insert(0, root_dir)
+        
+        from config import NBA_API_CONFIG
+        self.config = NBA_API_CONFIG
         self.output_dir = output_dir
         self.metadata = {
             'session_id': datetime.now().strftime('%Y%m%d_%H%M%S'),
@@ -111,15 +121,19 @@ class NBADataCollector:
             self.metadata['errors'].append(error_msg)
             return pd.DataFrame()
     
-    def collect_player_career_stats(self, player_ids: List[str] = None, limit: int = 300) -> Dict[str, pd.DataFrame]:
-        """Collecte des statistiques de carrière pour les 300 premiers joueurs actifs (limite recommandée)"""
-        logger.info("Collecte des statistiques de carrière pour les 300 premiers joueurs actifs...")
+    def collect_player_career_stats(self, player_ids: List[str] = None, limit: int = None) -> Dict[str, pd.DataFrame]:
+        """Collecte des statistiques de carrière pour les joueurs actifs (limite configurable)"""
+        
+        # Utiliser la configuration pour la limite
+        max_players = limit if limit is not None else self.config['max_players']
+        
+        logger.info(f"Collecte des statistiques de carrière pour les {max_players} premiers joueurs actifs...")
         
         if player_ids is None:
-            # Collecte des 300 premiers joueurs actifs (limite recommandée pour éviter les timeouts)
+            # Collecte des joueurs actifs selon la limite configurée
             all_players = players.get_active_players()
-            player_ids = [player['id'] for player in all_players[:300]]
-            logger.info(f"Collecte des stats de carrière pour {len(player_ids)} joueurs actifs (limite: 300)")
+            player_ids = [player['id'] for player in all_players[:max_players]]
+            logger.info(f"Collecte des stats de carrière pour {len(player_ids)} joueurs actifs (limite: {max_players})")
         elif limit:
             player_ids = player_ids[:limit]
         
@@ -148,7 +162,7 @@ class NBADataCollector:
                         logger.info(f"✅ {player_name}: {len(stats_df)} saisons collectées")
                 
                 # Pause pour éviter la surcharge de l'API
-                time.sleep(0.3)
+                time.sleep(self.config['delay'])
                 
             except Exception as e:
                 error_msg = f"Erreur collecte stats joueur {player_id}: {e}"
@@ -183,9 +197,10 @@ class NBADataCollector:
             logger.info(f"Collecte des stats pour {len(team_ids)} équipes")
         
         if seasons is None:
-            # Dernières 10 saisons pour plus de données
-            current_year = datetime.now().year
-            seasons = [f"{year}-{str(year+1)[-2:]}" for year in range(current_year-9, current_year+1)]
+            # Utiliser la configuration pour les saisons
+            start_year = self.config['start_year']
+            current_year = self.config['current_year']
+            seasons = [f"{year}-{str(year+1)[-2:]}" for year in range(start_year, current_year+1)]
         
         team_stats = {}
         total_processed = 0
@@ -211,7 +226,7 @@ class NBADataCollector:
                     
                     logger.info(f"✅ Équipe {team_id}: {len(stats_df)} saisons collectées")
                 
-                time.sleep(0.5)
+                time.sleep(self.config['delay'])
                 
             except Exception as e:
                 error_msg = f"Erreur collecte stats équipe {team_id}: {e}"
@@ -247,9 +262,12 @@ class NBADataCollector:
             try:
                 logger.info(f"Collecte leaders: {category}")
                 
+                current_year = datetime.now().year
+                current_season = f"{current_year-1}-{str(current_year)[-2:]}"
+                
                 leaders = leagueleaders.LeagueLeaders(
                     stat_category_abbreviation=category,
-                    season='2024-25',
+                    season=current_season,
                     season_type_all_star='Regular Season'
                 )
                 
@@ -262,7 +280,7 @@ class NBADataCollector:
                 
                 logger.info(f"✅ Leaders {category}: {len(leaders_df)} joueurs collectés")
                 
-                time.sleep(0.3)  # Pause réduite
+                time.sleep(self.config['delay'])  # Pause configurable
                 
             except Exception as e:
                 error_msg = f"Erreur collecte leaders {category}: {e}"
@@ -304,8 +322,9 @@ class NBADataCollector:
         return metadata_path
     
     def run_full_collection(self) -> Dict:
-        """Exécute la collecte complète des données NBA (limite: 300 joueurs actifs)"""
-        logger.info("🚀 Démarrage de la collecte complète des données NBA (limite: 300 joueurs actifs)")
+        """Exécute la collecte complète des données NBA (limite configurable)"""
+        max_players = self.config['max_players']
+        logger.info(f"🚀 Démarrage de la collecte complète des données NBA (limite: {max_players} joueurs actifs)")
         
         try:
             # Collecte des données statiques
@@ -319,6 +338,15 @@ class NBADataCollector:
             
             # Sauvegarde des métadonnées
             metadata_path = self.save_metadata()
+            
+            # Mise à jour des index et métadonnées globales
+            try:
+                from ingestion.metadata_manager import MetadataManager
+                metadata_manager = MetadataManager()
+                metadata_manager.update_all_metadata()
+                logger.info("✅ Index et métadonnées globales mis à jour")
+            except Exception as e:
+                logger.warning(f"⚠️ Erreur mise à jour métadonnées globales: {e}")
             
             # Résumé de la collecte
             summary = {

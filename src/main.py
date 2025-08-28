@@ -41,6 +41,7 @@ class NBADataLakeMenu:
         print("5. Analyse et insights")
         print("6. Configuration et paramètres")
         print("7. État du système")
+        print("8. Gestion des métadonnées et index")
         print("0. Quitter")
         print("="*60)
     
@@ -384,6 +385,35 @@ class NBADataLakeMenu:
         except Exception as e:
             print(f"❌ Erreur : {e}")
     
+    def gestion_metadonnees(self):
+        """Gère les métadonnées et index du DataLake"""
+        print("\n📊 GESTION DES MÉTADONNÉES ET INDEX")
+        print("="*50)
+        
+        try:
+            from ingestion.metadata_manager import MetadataManager
+            manager = MetadataManager()
+            
+            print("🔄 Mise à jour des métadonnées et index...")
+            result = manager.update_all_metadata()
+            
+            print(f"\n✅ Mise à jour terminée avec succès!")
+            print(f"📁 Index créé : {result['index_path']}")
+            print(f"📄 Métadonnées consolidées : {result['metadata_path']}")
+            
+            # Affichage du résumé
+            summary = result['summary']
+            print(f"\n📊 Résumé de la mise à jour:")
+            print(f"   - Fichiers totaux : {summary['total_files']}")
+            print(f"   - Taille totale : {summary['total_size_mb']} MB")
+            print(f"   - Catégories API NBA : {summary['categories']['api_nba']['count']}")
+            print(f"   - Catégories Kaggle : {summary['categories']['kaggle']['count']}")
+            print(f"   - Métadonnées de session : {summary['categories']['metadata']['count']}")
+            
+        except Exception as e:
+            print(f"❌ Erreur lors de la gestion des métadonnées : {e}")
+            print("💡 Vérifiez que le module metadata_manager.py est accessible")
+    
     def organiser_fichiers(self):
         """Organise les fichiers de données"""
         print("\n🗂️ Organisation des fichiers...")
@@ -460,6 +490,8 @@ class NBADataLakeMenu:
                 self.afficher_menu_config()
             elif choix == "7":
                 self.etat_systeme()
+            elif choix == "8":
+                self.gestion_metadonnees()
             elif choix == "0":
                 print("\n👋 Au revoir ! Merci d'avoir utilisé le NBA DataLake.")
                 break

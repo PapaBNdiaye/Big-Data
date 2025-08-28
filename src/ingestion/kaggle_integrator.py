@@ -52,6 +52,52 @@ class KaggleIntegrator:
         }
         
         logger.info(f"Intégrateur Kaggle initialisé - Session: {self.metadata['session_id']}")
+        
+        # Vérifier et corriger l'organisation des données existantes
+        self._verifier_organisation_donnees()
+    
+    def _verifier_organisation_donnees(self):
+        """Vérifie et corrige l'organisation des données Kaggle"""
+        try:
+            # Vérifier si les données sont dans raw/kaggle
+            if os.path.exists(self.raw_dir) and len(os.listdir(self.raw_dir)) > 0:
+                logger.info("✅ Données Kaggle déjà organisées dans la structure DataLake")
+                return
+            
+            # Si pas dans raw/kaggle mais dans kaggle/, les réorganiser
+            if os.path.exists(self.kaggle_dir) and len(os.listdir(self.kaggle_dir)) > 0:
+                logger.info("🔄 Réorganisation des données Kaggle existantes...")
+                self._reorganiser_donnees_existantes()
+            else:
+                logger.info("📁 Aucune donnée Kaggle trouvée, prêt pour téléchargement")
+                
+        except Exception as e:
+            logger.warning(f"Erreur vérification organisation: {e}")
+    
+    def _reorganiser_donnees_existantes(self):
+        """Réorganise les données Kaggle existantes dans la structure DataLake"""
+        try:
+            import shutil
+            
+            # Créer le dossier raw/kaggle
+            os.makedirs(self.raw_dir, exist_ok=True)
+            
+            # Copier tous les fichiers de kaggle/ vers raw/kaggle/
+            for item in os.listdir(self.kaggle_dir):
+                src = os.path.join(self.kaggle_dir, item)
+                dst = os.path.join(self.raw_dir, item)
+                
+                if os.path.isfile(src):
+                    shutil.copy2(src, dst)
+                    logger.info(f"  📄 Fichier réorganisé: {item}")
+                elif os.path.isdir(src):
+                    shutil.copytree(src, dst, dirs_exist_ok=True)
+                    logger.info(f"  📁 Dossier réorganisé: {item}")
+            
+            logger.info("✅ Données Kaggle réorganisées dans la structure DataLake")
+            
+        except Exception as e:
+            logger.error(f"Erreur réorganisation données existantes: {e}")
     
     def telecharger_dataset_kaggle(self, force_download: bool = False) -> bool:
         """
@@ -120,27 +166,42 @@ class KaggleIntegrator:
             f.write("5. Relancez l'intégration\n")
     
     def _copier_fichiers_kaggle(self, dataset_path: str):
-        """Copie les fichiers du dataset téléchargé vers notre dossier kaggle"""
+        """Copie les fichiers du dataset téléchargé vers la structure DataLake"""
         try:
-            logger.info(f"Copie des fichiers depuis {dataset_path}...")
+            logger.info(f"Copie des fichiers depuis {dataset_path} vers la structure DataLake...")
             
-            # Création du dossier de destination
-            os.makedirs(self.kaggle_dir, exist_ok=True)
+            # Création des dossiers de destination
+            os.makedirs(self.kaggle_dir, exist_ok=True)  # Backup original
+            os.makedirs(self.raw_dir, exist_ok=True)     # Données brutes DataLake
             
-            # Copie des fichiers
+            # Copie des fichiers vers raw/kaggle (structure DataLake)
             import shutil
             for item in os.listdir(dataset_path):
                 src = os.path.join(dataset_path, item)
-                dst = os.path.join(self.kaggle_dir, item)
+                dst_raw = os.path.join(self.raw_dir, item)  # data/raw/kaggle/
+                dst_backup = os.path.join(self.kaggle_dir, item)  # data/kaggle/ (backup)
                 
                 if os.path.isfile(src):
-                    shutil.copy2(src, dst)
-                    logger.info(f"  📄 Fichier copié: {item}")
+                    # Copier vers raw/kaggle (structure DataLake)
+                    shutil.copy2(src, dst_raw)
+                    logger.info(f"  📄 Fichier copié vers DataLake: {item}")
+                    
+                    # Copier aussi vers backup
+                    shutil.copy2(src, dst_backup)
+                    logger.info(f"  📄 Fichier copié vers backup: {item}")
+                    
                 elif os.path.isdir(src):
-                    shutil.copytree(src, dst, dirs_exist_ok=True)
-                    logger.info(f"  📁 Dossier copié: {item}")
+                    # Copier vers raw/kaggle (structure DataLake)
+                    shutil.copytree(src, dst_raw, dirs_exist_ok=True)
+                    logger.info(f"  📁 Dossier copié vers DataLake: {item}")
+                    
+                    # Copier aussi vers backup
+                    shutil.copytree(src, dst_backup, dirs_exist_ok=True)
+                    logger.info(f"  📁 Dossier copié vers backup: {item}")
             
-            logger.info("✅ Copie des fichiers terminée")
+            logger.info("✅ Copie des fichiers terminée - Structure DataLake respectée")
+            logger.info(f"   📁 Données brutes: {self.raw_dir}")
+            logger.info(f"   📁 Backup original: {self.kaggle_dir}")
             
         except Exception as e:
             logger.warning(f"Erreur lors de la copie des fichiers: {e}")
