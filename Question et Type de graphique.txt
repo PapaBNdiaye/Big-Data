@@ -1,0 +1,33 @@
+Synthèse : Projet Data Lake NBA
+ Liste des questions d'analyse
+
+ 1. Quels sont les joueurs ayant le plus progressé statistiquement sur les 5 dernières
+ saisons ?
+ Graphique recommandé : Graphique en barres horizontales - Évolution des statistiques
+ moyennes (points, rebonds, passes) par joueur avec barres de progression
+
+ 3. Quelles sont les tendances de blessures par poste, par saison, par équipe ?
+ Graphique recommandé : Graphique en aires empilées - Nombre de blessures par poste
+ au fil des saisons, avec une série temporelle pour chaque position
+
+ 4. Quels sont les matchs les plus spectaculaires en termes de scoring, de rebonds,
+ d'assists, etc. ?
+ Graphique recommandé : Nuage de points 3D - Score total du match (x), total rebonds
+ (y), total assists (z) avec points colorés selon l'intensité spectaculaire
+
+ 6. Quels sont les joueurs les plus décisifs dans les derniers quarts-temps ?
+ Graphique recommandé : Graphique radar/polaire - Performance des joueurs dans le
+ 4ème quart-temps avec axes pour points, assists, rebonds, pourcentage de réussite
+
+ 10. Quelles sont les tendances d'affluence dans les salles NBA, et leur relation avec la
+ performance des équipes ?
+ Graphique recommandé : Nuage de points avec régression linéaire - Affluence moyenne
+ (x) vs pourcentage de victoires (y) par équipe et par saison
+
+ 12. Quels sont les records individuels et collectifs et comment ont-ils évolué au fil des
+ décennies ?
+ Graphique recommandé : Graphique en courbes multiples - Évolution temporelle des
+ records (points en un match, rebonds, assists) par décennie avec lignes de tendance
+ 14. Analyse de la parité salariale entre joueurs, équipes, et son impact sur le jeu ?
+ Graphique recommandé : Histogramme groupé - Distribution des salaires par poste et
+ par équipe, avec boîtes à moustaches pour visualiser les écart
