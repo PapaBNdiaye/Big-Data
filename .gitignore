@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+
+# Données (ignorées par Git)
+data/
+*.csv
+*.sqlite
+*.db
+*.xlsx
+*.parquet
+
+# Logs
+*.log
+logs/
+
+# Fichiers de configuration sensibles
+.env
+.env.local
+.env.*.local
+config.local.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Cache et temporaires
+.cache/
+.pytest_cache/
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Fichiers de données volumineux
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Fichiers de sauvegarde
+*.bak
+*.backup
+*~
