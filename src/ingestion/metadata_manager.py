@@ -164,40 +164,32 @@ class MetadataManager:
         return consolidated_metadata
     
     def update_all_metadata(self):
-        """Met à jour tous les fichiers de métadonnées et index"""
-        print("🔄 Mise à jour des métadonnées et index...")
-        
-        # Création de l'index des données
-        data_index = self.create_data_index()
-        index_path = f'{self.metadata_dir}/index_donnees.json'
-        
-        with open(index_path, 'w', encoding='utf-8') as f:
-            json.dump(data_index, f, indent=2, ensure_ascii=False)
-        
-        print(f"✅ Index des données créé: {index_path}")
-        
-        # Consolidation des métadonnées de session
-        consolidated_metadata = self.consolidate_session_metadata()
-        metadata_path = f'{self.metadata_dir}/metadata_globale.json'
-        
-        with open(metadata_path, 'w', encoding='utf-8') as f:
-            json.dump(consolidated_metadata, f, indent=2, ensure_ascii=False)
-        
-        print(f"✅ Métadonnées consolidées créées: {metadata_path}")
-        
-        # Résumé
-        print(f"📊 Résumé de la mise à jour:")
-        print(f"   - Fichiers totaux: {data_index['total_files']}")
-        print(f"   - Taille totale: {data_index['total_size_mb']} MB")
-        print(f"   - Sessions: {consolidated_metadata['total_sessions']}")
-        print(f"   - Joueurs: {consolidated_metadata['statistics']['total_players_collected']}")
-        print(f"   - Équipes: {consolidated_metadata['statistics']['total_teams_collected']}")
-        
-        return {
-            'index_path': index_path,
-            'metadata_path': metadata_path,
-            'summary': data_index
-        }
+        """Mise à jour complète de toutes les métadonnées et index"""
+        try:
+            print("Mise à jour des métadonnées et index...")
+            
+            # Mise à jour des métadonnées globales
+            metadata_result = self.update_global_metadata()
+            
+            # Mise à jour de l'index des données
+            index_result = self.update_data_index()
+            
+            print(f"\nMise à jour terminée avec succès!")
+            print(f"  - Métadonnées: {'✅' if metadata_result['success'] else '❌'}")
+            print(f"  - Index: {'✅' if index_result['success'] else '❌'}")
+            
+            return {
+                'metadata': metadata_result,
+                'index': index_result
+            }
+            
+        except Exception as e:
+            error_msg = f"Erreur lors de la mise à jour complète: {e}"
+            print(f"❌ {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg
+            }
 
 if __name__ == "__main__":
     # Test du gestionnaire

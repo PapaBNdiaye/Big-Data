@@ -111,7 +111,7 @@ class NBADataLakeMenu:
             elif choix == "0":
                 break
             else:
-                print("❌ Choix invalide. Veuillez réessayer.")
+                print("Choix invalide. Veuillez réessayer.")
     
     def afficher_menu_database(self):
         """Menu de gestion de la base de données"""
@@ -131,21 +131,21 @@ class NBADataLakeMenu:
             choix = input("Votre choix : ").strip()
             
             if choix == "1":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "2":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "3":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "4":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "5":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "6":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "0":
                 break
             else:
-                print("❌ Choix invalide. Veuillez réessayer.")
+                print("Choix invalide. Veuillez réessayer.")
     
     def afficher_menu_dashboard(self):
         """Menu du dashboard et visualisations"""
@@ -166,17 +166,17 @@ class NBADataLakeMenu:
             if choix == "1":
                 self.lancer_dashboard()
             elif choix == "2":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "3":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "4":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "5":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "0":
                 break
             else:
-                print("❌ Choix invalide. Veuillez réessayer.")
+                print("Choix invalide. Veuillez réessayer.")
     
     def afficher_menu_analyse(self):
         """Menu d'analyse et insights"""
@@ -195,19 +195,19 @@ class NBADataLakeMenu:
             choix = input("Votre choix : ").strip()
             
             if choix == "1":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "2":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "3":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "4":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "5":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "0":
                 break
             else:
-                print("❌ Choix invalide. Veuillez réessayer.")
+                print("Choix invalide. Veuillez réessayer.")
     
     def afficher_menu_config(self):
         """Menu de configuration"""
@@ -227,21 +227,21 @@ class NBADataLakeMenu:
             choix = input("Votre choix : ").strip()
             
             if choix == "1":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "2":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "3":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "4":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "5":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "6":
-                print("🔄 Fonctionnalité en cours de développement...")
+                print("Fonctionnalité en cours de développement...")
             elif choix == "0":
                 break
             else:
-                print("❌ Choix invalide. Veuillez réessayer.")
+                print("Choix invalide. Veuillez réessayer.")
     
     def collecte_complete(self):
         """Lance la collecte complète des données"""
@@ -432,7 +432,7 @@ class NBADataLakeMenu:
     def lancer_dashboard(self):
         """Lance le dashboard interactif"""
         print("\n🚀 Lancement du dashboard...")
-        print("🔄 Fonctionnalité en cours de développement...")
+        print("Fonctionnalité en cours de développement...")
         print("📋 Prochainement : Interface Dash avec Plotly")
     
     def etat_systeme(self):
@@ -496,7 +496,7 @@ class NBADataLakeMenu:
                 print("\n👋 Au revoir ! Merci d'avoir utilisé le NBA DataLake.")
                 break
             else:
-                print("❌ Choix invalide. Veuillez réessayer.")
+                print("Choix invalide. Veuillez réessayer.")
             
             input("\nAppuyez sur Entrée pour continuer...")
 

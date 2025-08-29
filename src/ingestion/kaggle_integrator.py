@@ -31,12 +31,10 @@ class KaggleIntegrator:
     
     def __init__(self, data_dir: str = 'data'):
         self.data_dir = data_dir
-        self.kaggle_dir = f'{data_dir}/kaggle'
         self.raw_dir = f'{data_dir}/raw/kaggle'  # Données Kaggle dans raw/kaggle
         self.processed_dir = f'{data_dir}/processed'
         
         # Création des dossiers nécessaires
-        os.makedirs(self.kaggle_dir, exist_ok=True)
         os.makedirs(self.raw_dir, exist_ok=True)
         os.makedirs(self.processed_dir, exist_ok=True)
         
@@ -52,52 +50,6 @@ class KaggleIntegrator:
         }
         
         logger.info(f"Intégrateur Kaggle initialisé - Session: {self.metadata['session_id']}")
-        
-        # Vérifier et corriger l'organisation des données existantes
-        self._verifier_organisation_donnees()
-    
-    def _verifier_organisation_donnees(self):
-        """Vérifie et corrige l'organisation des données Kaggle"""
-        try:
-            # Vérifier si les données sont dans raw/kaggle
-            if os.path.exists(self.raw_dir) and len(os.listdir(self.raw_dir)) > 0:
-                logger.info("✅ Données Kaggle déjà organisées dans la structure DataLake")
-                return
-            
-            # Si pas dans raw/kaggle mais dans kaggle/, les réorganiser
-            if os.path.exists(self.kaggle_dir) and len(os.listdir(self.kaggle_dir)) > 0:
-                logger.info("🔄 Réorganisation des données Kaggle existantes...")
-                self._reorganiser_donnees_existantes()
-            else:
-                logger.info("📁 Aucune donnée Kaggle trouvée, prêt pour téléchargement")
-                
-        except Exception as e:
-            logger.warning(f"Erreur vérification organisation: {e}")
-    
-    def _reorganiser_donnees_existantes(self):
-        """Réorganise les données Kaggle existantes dans la structure DataLake"""
-        try:
-            import shutil
-            
-            # Créer le dossier raw/kaggle
-            os.makedirs(self.raw_dir, exist_ok=True)
-            
-            # Copier tous les fichiers de kaggle/ vers raw/kaggle/
-            for item in os.listdir(self.kaggle_dir):
-                src = os.path.join(self.kaggle_dir, item)
-                dst = os.path.join(self.raw_dir, item)
-                
-                if os.path.isfile(src):
-                    shutil.copy2(src, dst)
-                    logger.info(f"  📄 Fichier réorganisé: {item}")
-                elif os.path.isdir(src):
-                    shutil.copytree(src, dst, dirs_exist_ok=True)
-                    logger.info(f"  📁 Dossier réorganisé: {item}")
-            
-            logger.info("✅ Données Kaggle réorganisées dans la structure DataLake")
-            
-        except Exception as e:
-            logger.error(f"Erreur réorganisation données existantes: {e}")
     
     def telecharger_dataset_kaggle(self, force_download: bool = False) -> bool:
         """
@@ -107,11 +59,6 @@ class KaggleIntegrator:
         logger.info("Téléchargement du dataset Kaggle NBA via kagglehub...")
         
         try:
-            # Vérification si le dataset existe déjà
-            if os.path.exists(self.kaggle_dir) and len(os.listdir(self.kaggle_dir)) > 1 and not force_download:
-                logger.info("Dataset Kaggle déjà présent, téléchargement ignoré")
-                return True
-            
             # Téléchargement via kagglehub
             try:
                 import kagglehub
@@ -120,9 +67,9 @@ class KaggleIntegrator:
                 # Téléchargement du dataset
                 dataset_path = kagglehub.dataset_download("wyattowalsh/basketball")
                 
-                logger.info(f"✅ Dataset téléchargé via kagglehub: {dataset_path}")
+                logger.info(f"Dataset téléchargé via kagglehub: {dataset_path}")
                 
-                # Copie des fichiers vers notre dossier kaggle
+                # Copie des fichiers vers la structure DataLake
                 self._copier_fichiers_kaggle(dataset_path)
                 
                 return True
@@ -145,97 +92,41 @@ class KaggleIntegrator:
     
     def _instructions_telechargement_manuel(self):
         """Affiche les instructions pour le téléchargement manuel"""
-        print("\n📥 TÉLÉCHARGEMENT MANUEL REQUIS")
+        print("\nTÉLÉCHARGEMENT MANUEL REQUIS")
         print("="*50)
         print("1. Allez sur : https://www.kaggle.com/datasets/wyattowalsh/basketball/data")
         print("2. Cliquez sur 'Download' (bouton bleu)")
-        print("3. Placez le fichier ZIP dans le dossier : data/kaggle/")
+        print("3. Placez le fichier ZIP dans le dossier : data/raw/kaggle/")
         print("4. Renommez-le en : basketball_dataset.zip")
         print("5. Relancez l'intégration")
         print("="*50)
-        
-        # Création du fichier d'instructions
-        instructions_path = f'{self.kaggle_dir}/INSTRUCTIONS_TELECHARGEMENT.txt'
-        with open(instructions_path, 'w', encoding='utf-8') as f:
-            f.write("Instructions de téléchargement manuel du dataset Kaggle NBA\n")
-            f.write("="*50 + "\n")
-            f.write("1. Allez sur : https://www.kaggle.com/datasets/wyattowalsh/basketball/data\n")
-            f.write("2. Cliquez sur 'Download' (bouton bleu)\n")
-            f.write("3. Placez le fichier ZIP dans ce dossier\n")
-            f.write("4. Renommez-le en : basketball_dataset.zip\n")
-            f.write("5. Relancez l'intégration\n")
     
     def _copier_fichiers_kaggle(self, dataset_path: str):
         """Copie les fichiers du dataset téléchargé vers la structure DataLake"""
         try:
             logger.info(f"Copie des fichiers depuis {dataset_path} vers la structure DataLake...")
             
-            # Création des dossiers de destination
-            os.makedirs(self.kaggle_dir, exist_ok=True)  # Backup original
-            os.makedirs(self.raw_dir, exist_ok=True)     # Données brutes DataLake
-            
             # Copie des fichiers vers raw/kaggle (structure DataLake)
             import shutil
             for item in os.listdir(dataset_path):
                 src = os.path.join(dataset_path, item)
                 dst_raw = os.path.join(self.raw_dir, item)  # data/raw/kaggle/
-                dst_backup = os.path.join(self.kaggle_dir, item)  # data/kaggle/ (backup)
                 
                 if os.path.isfile(src):
                     # Copier vers raw/kaggle (structure DataLake)
                     shutil.copy2(src, dst_raw)
-                    logger.info(f"  📄 Fichier copié vers DataLake: {item}")
-                    
-                    # Copier aussi vers backup
-                    shutil.copy2(src, dst_backup)
-                    logger.info(f"  📄 Fichier copié vers backup: {item}")
+                    logger.info(f"  Fichier copié vers DataLake: {item}")
                     
                 elif os.path.isdir(src):
                     # Copier vers raw/kaggle (structure DataLake)
                     shutil.copytree(src, dst_raw, dirs_exist_ok=True)
-                    logger.info(f"  📁 Dossier copié vers DataLake: {item}")
-                    
-                    # Copier aussi vers backup
-                    shutil.copytree(src, dst_backup, dirs_exist_ok=True)
-                    logger.info(f"  📁 Dossier copié vers backup: {item}")
+                    logger.info(f"  Dossier copié vers DataLake: {item}")
             
-            logger.info("✅ Copie des fichiers terminée - Structure DataLake respectée")
-            logger.info(f"   📁 Données brutes: {self.raw_dir}")
-            logger.info(f"   📁 Backup original: {self.kaggle_dir}")
+            logger.info("Copie des fichiers terminée - Structure DataLake respectée")
+            logger.info(f"   Données brutes: {self.raw_dir}")
             
         except Exception as e:
             logger.warning(f"Erreur lors de la copie des fichiers: {e}")
-    
-    def extraire_dataset(self) -> bool:
-        """Extrait le dataset ZIP téléchargé (si nécessaire)"""
-        logger.info("Vérification de l'extraction du dataset Kaggle...")
-        
-        try:
-            # kagglehub extrait automatiquement les fichiers, vérifions s'ils sont présents
-            csv_files = [f for f in os.listdir(self.kaggle_dir) if f.endswith('.csv')]
-            
-            if csv_files:
-                logger.info(f"✅ Dataset déjà extrait - {len(csv_files)} fichiers CSV trouvés")
-                return True
-            
-            # Si pas de fichiers CSV, vérifions s'il y a un ZIP à extraire
-            zip_path = f'{self.kaggle_dir}/basketball_dataset.zip'
-            
-            if os.path.exists(zip_path):
-                logger.info("Extraction du fichier ZIP...")
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(self.kaggle_dir)
-                logger.info("✅ Dataset extrait avec succès")
-                return True
-            else:
-                logger.warning("Aucun fichier CSV ou ZIP trouvé")
-                return False
-            
-        except Exception as e:
-            error_msg = f"Erreur extraction dataset: {e}"
-            logger.error(error_msg)
-            self.metadata['errors'].append(error_msg)
-            return False
     
     def analyser_structure_dataset(self) -> Dict:
         """Analyse la structure et le contenu du dataset"""
@@ -250,9 +141,9 @@ class KaggleIntegrator:
                 'columns_summary': {}
             }
             
-            # Recherche des fichiers CSV dans le dossier Kaggle
+            # Recherche des fichiers CSV dans le dossier raw/kaggle
             kaggle_files = []
-            for root, dirs, files in os.walk(self.kaggle_dir):
+            for root, dirs, files in os.walk(self.raw_dir):
                 for file in files:
                     if file.endswith('.csv'):
                         kaggle_files.append(os.path.join(root, file))
@@ -261,7 +152,7 @@ class KaggleIntegrator:
                 logger.warning("Aucun fichier CSV trouvé dans le dataset")
                 return analysis
             
-            logger.info(f"📁 {len(kaggle_files)} fichiers CSV trouvés")
+            logger.info(f"{len(kaggle_files)} fichiers CSV trouvés")
             
             for file_path in kaggle_files:
                 try:
@@ -297,7 +188,7 @@ class KaggleIntegrator:
                         'date_columns': len(df_sample.select_dtypes(include=['datetime']).columns)
                     }
                     
-                    logger.info(f"✅ {file_name} analysé - {len(df_sample.columns)} colonnes")
+                    logger.info(f"{file_name} analysé - {len(df_sample.columns)} colonnes")
                     
                 except Exception as e:
                     error_msg = f"Erreur analyse {file_name}: {e}"
@@ -306,11 +197,11 @@ class KaggleIntegrator:
                     continue
             
             # Sauvegarde de l'analyse
-            analysis_path = f'{self.kaggle_dir}/structure_analysis_{self.metadata["session_id"]}.json'
+            analysis_path = f'{self.raw_dir}/structure_analysis_{self.metadata["session_id"]}.json'
             with open(analysis_path, 'w', encoding='utf-8') as f:
                 json.dump(analysis, f, indent=2, ensure_ascii=False)
             
-            logger.info(f"✅ Analyse de structure sauvegardée: {analysis_path}")
+            logger.info(f"Analyse de structure sauvegardée: {analysis_path}")
             
             return analysis
             
@@ -332,11 +223,11 @@ class KaggleIntegrator:
                 'recommendations': []
             }
             
-            # Recherche des fichiers CSV
-            csv_files = [f for f in os.listdir(self.kaggle_dir) if f.endswith('.csv')]
+            # Recherche des fichiers CSV dans raw/kaggle
+            csv_files = [f for f in os.listdir(self.raw_dir) if f.endswith('.csv')]
             
             for csv_file in csv_files:
-                file_path = os.path.join(self.kaggle_dir, csv_file)
+                file_path = os.path.join(self.raw_dir, csv_file)
                 logger.info(f"Validation de {csv_file}...")
                 
                 try:
@@ -376,7 +267,7 @@ class KaggleIntegrator:
                     
                     validation_report['recommendations'].extend(recommendations)
                     
-                    logger.info(f"✅ {csv_file} validé - {quality_metrics['missing_percentage']:.1f}% manquants")
+                    logger.info(f"{csv_file} validé - {quality_metrics['missing_percentage']:.1f}% manquants")
                     
                 except Exception as e:
                     error_msg = f"Erreur validation {csv_file}: {e}"
@@ -385,11 +276,11 @@ class KaggleIntegrator:
                     continue
             
             # Sauvegarde du rapport de validation
-            validation_path = f'{self.kaggle_dir}/quality_validation_{self.metadata["session_id"]}.json'
+            validation_path = f'{self.raw_dir}/quality_validation_{self.metadata["session_id"]}.json'
             with open(validation_path, 'w', encoding='utf-8') as f:
                 json.dump(validation_report, f, indent=2, ensure_ascii=False)
             
-            logger.info(f"✅ Rapport de validation sauvegardé: {validation_path}")
+            logger.info(f"Rapport de validation sauvegardé: {validation_path}")
             
             return validation_report
             
@@ -405,8 +296,9 @@ class KaggleIntegrator:
         
         try:
             # Vérification des données disponibles
-            kaggle_files = [f for f in os.listdir(self.kaggle_dir) if f.endswith('.csv')]
-            api_files = [f for f in os.listdir(self.raw_dir) if f.endswith('.csv')]
+            kaggle_files = [f for f in os.listdir(self.raw_dir) if f.endswith('.csv')]
+            api_dir = f'{self.data_dir}/raw/api_nba'
+            api_files = [f for f in os.listdir(api_dir) if f.endswith('.csv')] if os.path.exists(api_dir) else []
             
             if not kaggle_files:
                 logger.error("Aucun fichier Kaggle disponible pour la fusion")
@@ -416,7 +308,7 @@ class KaggleIntegrator:
                 logger.error("Aucun fichier API disponible pour la fusion")
                 return False
             
-            logger.info(f"📁 Fusion de {len(kaggle_files)} fichiers Kaggle avec {len(api_files)} fichiers API")
+            logger.info(f"Fusion de {len(kaggle_files)} fichiers Kaggle avec {len(api_files)} fichiers API")
             
             # Création du dossier de fusion
             fusion_dir = f'{self.processed_dir}/fusion_{self.metadata["session_id"]}'
@@ -427,18 +319,18 @@ class KaggleIntegrator:
             
             for kaggle_file in kaggle_files:
                 try:
-                    kaggle_path = os.path.join(self.kaggle_dir, kaggle_file)
+                    kaggle_path = os.path.join(self.raw_dir, kaggle_file)
                     logger.info(f"Traitement de {kaggle_file}...")
                     
                     # Lecture du fichier Kaggle
                     df_kaggle = pd.read_csv(kaggle_path, nrows=10000)  # Limite pour la démo
                     
                     # Recherche de correspondances avec l'API
-                    api_matches = self._trouver_correspondances_api(df_kaggle, kaggle_file)
+                    api_matches = self._trouver_correspondances_api(df_kaggle, kaggle_file, api_files)
                     
                     if api_matches:
                         # Fusion des données
-                        df_fusion = self._fusionner_donnees(df_kaggle, api_matches, kaggle_file)
+                        df_fusion = self._fusionner_donnees(df_kaggle, api_matches, kaggle_file, api_dir)
                         
                         # Sauvegarde du fichier fusionné
                         fusion_path = os.path.join(fusion_dir, f"fusion_{kaggle_file}")
@@ -451,9 +343,9 @@ class KaggleIntegrator:
                             'api_matches': len(api_matches)
                         }
                         
-                        logger.info(f"✅ {kaggle_file} fusionné - {len(df_fusion)} lignes")
+                        logger.info(f"{kaggle_file} fusionné - {len(df_fusion)} lignes")
                     else:
-                        logger.info(f"ℹ️ Aucune correspondance API trouvée pour {kaggle_file}")
+                        logger.info(f"Aucune correspondance API trouvée pour {kaggle_file}")
                         
                 except Exception as e:
                     error_msg = f"Erreur fusion {kaggle_file}: {e}"
@@ -465,7 +357,7 @@ class KaggleIntegrator:
             with open(fusion_summary_path, 'w', encoding='utf-8') as f:
                 json.dump(fusion_results, f, indent=2, ensure_ascii=False)
             
-            logger.info(f"✅ Fusion terminée - {len(fusion_results)} fichiers traités")
+            logger.info(f"Fusion terminée - {len(fusion_results)} fichiers traités")
             
             return True
             
@@ -475,29 +367,27 @@ class KaggleIntegrator:
             self.metadata['errors'].append(error_msg)
             return False
     
-    def _trouver_correspondances_api(self, df_kaggle: pd.DataFrame, kaggle_file: str) -> List[str]:
+    def _trouver_correspondances_api(self, df_kaggle: pd.DataFrame, kaggle_file: str, api_files: List[str]) -> List[str]:
         """Trouve les correspondances entre les données Kaggle et l'API"""
         correspondances = []
         
         try:
             # Recherche des fichiers API correspondants
             if 'player' in kaggle_file.lower():
-                api_files = [f for f in os.listdir(self.raw_dir) if 'player' in f.lower()]
+                correspondances = [f for f in api_files if 'player' in f.lower()][:3]
             elif 'team' in kaggle_file.lower():
-                api_files = [f for f in os.listdir(self.raw_dir) if 'team' in f.lower()]
+                correspondances = [f for f in api_files if 'team' in f.lower()][:3]
             elif 'game' in kaggle_file.lower():
-                api_files = [f for f in os.listdir(self.raw_dir) if 'game' in f.lower()]
+                correspondances = [f for f in api_files if 'game' in f.lower()][:3]
             else:
-                api_files = [f for f in os.listdir(self.raw_dir)]
-            
-            correspondances = api_files[:3]  # Limite à 3 correspondances
+                correspondances = api_files[:3]  # Limite à 3 correspondances
             
         except Exception as e:
             logger.warning(f"Erreur recherche correspondances: {e}")
         
         return correspondances
     
-    def _fusionner_donnees(self, df_kaggle: pd.DataFrame, api_files: List[str], kaggle_file: str) -> pd.DataFrame:
+    def _fusionner_donnees(self, df_kaggle: pd.DataFrame, api_files: List[str], kaggle_file: str, api_dir: str) -> pd.DataFrame:
         """Fusionne les données Kaggle avec les données API"""
         df_fusion = df_kaggle.copy()
         
@@ -513,20 +403,20 @@ class KaggleIntegrator:
             # Tentative de correspondance des colonnes
             for api_file in api_files:
                 try:
-                    api_path = os.path.join(self.raw_dir, api_file)
+                    api_path = os.path.join(api_dir, api_file)
                     df_api = pd.read_csv(api_path, nrows=1000)  # Échantillon API
                     
                     # Recherche de colonnes communes
                     common_columns = set(df_kaggle.columns) & set(df_api.columns)
                     
                     if common_columns:
-                        logger.info(f"  📊 Colonnes communes trouvées: {list(common_columns)}")
+                        logger.info(f"  Colonnes communes trouvées: {list(common_columns)}")
                         
                         # Ajout d'informations de correspondance
                         df_fusion[f'api_{api_file}_columns_matched'] = str(list(common_columns))
                         
                 except Exception as e:
-                    logger.warning(f"  ⚠️ Erreur lecture {api_file}: {e}")
+                    logger.warning(f"  Erreur lecture {api_file}: {e}")
                     continue
             
         except Exception as e:
@@ -539,73 +429,19 @@ class KaggleIntegrator:
         logger.info("Organisation des fichiers de données...")
         
         try:
-            # Structure d'organisation
-            organization_structure = {
-                'kaggle': {
-                    'raw': 'Données brutes Kaggle',
-                    'processed': 'Données traitées Kaggle',
-                    'analysis': 'Analyses et rapports'
-                },
-                'api': {
-                    'raw': 'Données brutes API NBA',
-                    'processed': 'Données traitées API NBA'
-                },
-                'fusion': {
-                    'combined': 'Données fusionnées',
-                    'validation': 'Validation et qualité'
-                }
-            }
-            
-            # Création des dossiers d'organisation
-            for category, subdirs in organization_structure.items():
-                for subdir, description in subdirs.items():
-                    dir_path = f'{self.data_dir}/{category}/{subdir}'
-                    os.makedirs(dir_path, exist_ok=True)
-                    
-                    # Création d'un fichier README pour chaque dossier
-                    readme_path = os.path.join(dir_path, 'README.md')
-                    if not os.path.exists(readme_path):
-                        with open(readme_path, 'w', encoding='utf-8') as f:
-                            f.write(f"# {description}\n\n")
-                            f.write(f"Dossier: {category}/{subdir}\n\n")
-                            f.write(f"Description: {description}\n")
-                            f.write(f"Créé le: {datetime.now().isoformat()}\n")
-            
-            # Déplacement des fichiers existants
-            self._deplacer_fichiers_existants()
-            
-            logger.info("✅ Organisation des fichiers terminée")
-            return True
+            # Vérifier que les données sont bien dans raw/kaggle
+            if os.path.exists(self.raw_dir) and len(os.listdir(self.raw_dir)) > 0:
+                logger.info("Fichiers Kaggle déjà organisés dans data/raw/kaggle")
+                return True
+            else:
+                logger.info("Aucun fichier Kaggle trouvé dans data/raw/kaggle")
+                return False
             
         except Exception as e:
             error_msg = f"Erreur organisation fichiers: {e}"
             logger.error(error_msg)
             self.metadata['errors'].append(error_msg)
             return False
-    
-    def _deplacer_fichiers_existants(self):
-        """Déplace les fichiers existants vers la nouvelle structure"""
-        try:
-            # Déplacement des fichiers Kaggle
-            if os.path.exists(self.kaggle_dir):
-                kaggle_files = [f for f in os.listdir(self.kaggle_dir) if f.endswith('.csv')]
-                for file in kaggle_files:
-                    src = os.path.join(self.kaggle_dir, file)
-                    dst = os.path.join(f'{self.data_dir}/kaggle/raw', file)
-                    if not os.path.exists(dst):
-                        os.rename(src, dst)
-            
-            # Déplacement des fichiers API
-            if os.path.exists(self.raw_dir):
-                api_files = [f for f in os.listdir(self.raw_dir) if f.endswith('.csv')]
-                for file in api_files:
-                    src = os.path.join(self.raw_dir, file)
-                    dst = os.path.join(f'{self.data_dir}/api/raw', file)
-                    if not os.path.exists(dst):
-                        os.rename(src, dst)
-                        
-        except Exception as e:
-            logger.warning(f"Erreur déplacement fichiers: {e}")
     
     def sauvegarder_metadata(self):
         """Sauvegarde les métadonnées de l'intégration"""
@@ -615,18 +451,18 @@ class KaggleIntegrator:
             datetime.fromisoformat(self.metadata['start_time'])
         ).total_seconds()
         
-        metadata_path = f'{self.kaggle_dir}/integration_metadata_{self.metadata["session_id"]}.json'
+        metadata_path = f'{self.raw_dir}/integration_metadata_{self.metadata["session_id"]}.json'
         
         with open(metadata_path, 'w', encoding='utf-8') as f:
             json.dump(self.metadata, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"✅ Métadonnées d'intégration sauvegardées: {metadata_path}")
+        logger.info(f"Métadonnées d'intégration sauvegardées: {metadata_path}")
         
         return metadata_path
     
     def run_full_integration(self) -> Dict:
         """Exécute l'intégration complète du dataset Kaggle"""
-        logger.info("🚀 Démarrage de l'intégration complète du dataset Kaggle")
+        logger.info("Démarrage de l'intégration complète du dataset Kaggle")
         
         try:
             # 1. Téléchargement du dataset
@@ -634,26 +470,19 @@ class KaggleIntegrator:
             if not download_success:
                 logger.warning("Téléchargement non réussi, continuation avec les fichiers existants")
             
-            # 2. Extraction si nécessaire
-            if download_success:
-                extract_success = self.extraire_dataset()
-                if not extract_success:
-                    logger.error("Échec de l'extraction du dataset")
-                    return {}
-            
-            # 3. Analyse de la structure
+            # 2. Analyse de la structure
             structure_analysis = self.analyser_structure_dataset()
             
-            # 4. Validation de la qualité
+            # 3. Validation de la qualité
             quality_validation = self.valider_qualite_donnees()
             
-            # 5. Fusion avec l'API NBA
+            # 4. Fusion avec l'API NBA
             fusion_success = self.fusionner_avec_api_nba()
             
-            # 6. Organisation des fichiers
+            # 5. Organisation des fichiers
             organization_success = self.organiser_fichiers()
             
-            # 7. Sauvegarde des métadonnées
+            # 6. Sauvegarde des métadonnées
             metadata_path = self.sauvegarder_metadata()
             
             # Résumé de l'intégration
@@ -669,8 +498,8 @@ class KaggleIntegrator:
                 'metadata_file': metadata_path
             }
             
-            logger.info("✅ Intégration Kaggle terminée avec succès")
-            logger.info(f"📊 Résumé: {summary}")
+            logger.info("Intégration Kaggle terminée avec succès")
+            logger.info(f"Résumé: {summary}")
             
             return summary
             

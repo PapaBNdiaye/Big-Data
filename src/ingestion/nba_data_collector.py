@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Collecteur de données NBA pour DataLake
+Collecteur de données NBA pour DataLake - Version corrigée
 Récupère et structure les données depuis l'API NBA officielle
+Toutes les valeurs sont configurables via config.py
 """
 
 import sys
@@ -11,7 +12,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from nba_api.stats.endpoints import (
     playercareerstats, teamyearbyyearstats, leagueleaders,
-    playergamelog, teamgamelog, commonplayerinfo
+    playergamelog, teamgamelog, commonplayerinfo,
+    leaguedashplayerstats,  # Pour Player/General/Traditional
+    playerdashboardbyclutch,  # Pour Player/Clutch/Traditional
+    leaguedashplayerclutch,  # Pour stats clutch league-wide
+    leaguedashteamstats  # Pour Team/Traditional
 )
 from nba_api.stats.static import players, teams
 from nba_api.live.nba.endpoints import scoreboard
@@ -121,188 +126,452 @@ class NBADataCollector:
             self.metadata['errors'].append(error_msg)
             return pd.DataFrame()
     
-    def collect_player_career_stats(self, player_ids: List[str] = None, limit: int = None) -> Dict[str, pd.DataFrame]:
-        """Collecte des statistiques de carrière pour les joueurs actifs (limite configurable)"""
+    def collect_player_career_stats(self) -> pd.DataFrame:
+        """Collecte des statistiques de carrière pour tous les joueurs actifs"""
+        logger.info("Collecte des statistiques de carrière des joueurs...")
         
-        # Utiliser la configuration pour la limite
-        max_players = limit if limit is not None else self.config['max_players']
-        
-        logger.info(f"Collecte des statistiques de carrière pour les {max_players} premiers joueurs actifs...")
-        
-        if player_ids is None:
-            # Collecte des joueurs actifs selon la limite configurée
-            all_players = players.get_active_players()
-            player_ids = [player['id'] for player in all_players[:max_players]]
-            logger.info(f"Collecte des stats de carrière pour {len(player_ids)} joueurs actifs (limite: {max_players})")
-        elif limit:
-            player_ids = player_ids[:limit]
-        
-        career_stats = {}
-        total_processed = 0
-        
-        for i, player_id in enumerate(player_ids):
-            try:
-                if i % 10 == 0:  # Log tous les 10 joueurs
-                    logger.info(f"Collecte joueur {i+1}/{len(player_ids)} - ID: {player_id}")
-                
-                # Récupération des stats de carrière
-                stats = playercareerstats.PlayerCareerStats(player_id=player_id)
-                stats_df = stats.get_data_frames()[0]
-                
-                if not stats_df.empty:
-                    # Récupération des infos du joueur
-                    player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
-                    info_df = player_info.get_data_frames()[0]
+        try:
+            # Récupération des joueurs actifs uniquement
+            active_players = [p for p in players.get_players() if p['is_active']]
+            max_players = min(self.config['max_players'], len(active_players))
+            
+            logger.info(f"Collecte des statistiques pour {max_players} joueurs actifs...")
+            
+            all_career_stats = []
+            
+            for i, player in enumerate(active_players[:max_players]):
+                try:
+                    logger.info(f"Collecte joueur {i+1}/{max_players}: {player['full_name']}")
                     
-                    if not info_df.empty:
-                        player_name = info_df.iloc[0]['DISPLAY_FIRST_LAST']
-                        career_stats[player_name] = stats_df
-                        total_processed += 1
-                        
-                        logger.info(f"✅ {player_name}: {len(stats_df)} saisons collectées")
-                
-                # Pause pour éviter la surcharge de l'API
-                time.sleep(self.config['delay'])
-                
-            except Exception as e:
-                error_msg = f"Erreur collecte stats joueur {player_id}: {e}"
-                logger.error(error_msg)
-                self.metadata['errors'].append(error_msg)
-                continue
-        
-        # Sauvegarde de TOUTES les stats de carrière dans un seul fichier
-        if career_stats:
-            all_career_stats = pd.concat(career_stats.values(), ignore_index=True)
-            raw_path = f'{self.output_dir}/raw/api_nba/career_stats_ALL_{self.metadata["session_id"]}.csv'
-            all_career_stats.to_csv(raw_path, index=False)
-            logger.info(f"✅ Toutes les stats de carrière sauvegardées: {raw_path}")
-        
-        # Ajout aux métadonnées
-        self.metadata['collected_data']['player_career_stats'] = {
-            'players_processed': total_processed,
-            'total_seasons': sum(len(df) for df in career_stats.values()),
-            'total_file': raw_path if career_stats else None
-        }
-        
-        return career_stats
-    
-    def collect_team_season_stats(self, team_ids: List[str] = None, seasons: List[str] = None) -> Dict[str, pd.DataFrame]:
-        """Collecte des statistiques saisonnières pour TOUTES les équipes"""
-        logger.info("Collecte des statistiques saisonnières pour TOUTES les équipes...")
-        
-        if team_ids is None:
-            # Collecte de TOUTES les équipes actuelles
-            all_teams = teams.get_teams()
-            team_ids = [team['id'] for team in all_teams]
-            logger.info(f"Collecte des stats pour {len(team_ids)} équipes")
-        
-        if seasons is None:
-            # Utiliser la configuration pour les saisons
-            start_year = self.config['start_year']
-            current_year = self.config['current_year']
-            seasons = [f"{year}-{str(year+1)[-2:]}" for year in range(start_year, current_year+1)]
-        
-        team_stats = {}
-        total_processed = 0
-        
-        for team_id in team_ids:
-            try:
-                logger.info(f"Collecte équipe ID: {team_id}")
-                
-                # Récupération des stats par saison
-                stats = teamyearbyyearstats.TeamYearByYearStats(team_id=team_id)
-                stats_df = stats.get_data_frames()[0]
-                
-                # Filtrage par saisons demandées
-                if seasons:
-                    stats_df = stats_df[stats_df['YEAR'].isin(seasons)]
-                
-                if not stats_df.empty:
-                    team_stats[team_id] = stats_df
+                    career = playercareerstats.PlayerCareerStats(player_id=player['id'])
+                    career_df = career.get_data_frames()[0]
                     
-                    # Sauvegarde des données brutes
-                    raw_path = f'{self.output_dir}/raw/api_nba/team_stats_{team_id}_{self.metadata["session_id"]}.csv'
-                    stats_df.to_csv(raw_path, index=False)
+                    # Ajout des informations du joueur
+                    career_df['PLAYER_NAME'] = player['full_name']
+                    career_df['PLAYER_ID'] = player['id']
+                    all_career_stats.append(career_df)
                     
-                    logger.info(f"✅ Équipe {team_id}: {len(stats_df)} saisons collectées")
-                
-                time.sleep(self.config['delay'])
-                
-            except Exception as e:
-                error_msg = f"Erreur collecte stats équipe {team_id}: {e}"
-                logger.error(error_msg)
-                self.metadata['errors'].append(error_msg)
-                continue
-        
-        # Sauvegarde de TOUTES les stats d'équipes dans un seul fichier
-        if team_stats:
-            all_team_stats = pd.concat(team_stats.values(), ignore_index=True)
-            raw_path = f'{self.output_dir}/raw/api_nba/team_stats_ALL_{self.metadata["session_id"]}.csv'
-            all_team_stats.to_csv(raw_path, index=False)
-            logger.info(f"✅ Toutes les stats d'équipes sauvegardées: {raw_path}")
-        
-        # Ajout aux métadonnées
-        self.metadata['collected_data']['team_season_stats'] = {
-            'teams_processed': len(team_stats),
-            'total_seasons': sum(len(df) for df in team_stats.values()),
-            'total_file': raw_path if team_stats else None
-        }
-        
-        return team_stats
-    
-    def collect_current_leaders(self) -> Dict[str, pd.DataFrame]:
-        """Collecte des leaders actuels de la NBA pour TOUTES les catégories"""
-        logger.info("Collecte des leaders actuels pour TOUTES les catégories...")
-        
-        leaders_data = {}
-        # TOUTES les catégories de leaders disponibles
-        stat_categories = ['PTS', 'REB', 'AST', 'STL', 'BLK', 'FG_PCT', 'FG3_PCT', 'FT_PCT', 'MIN', 'GP', 'EFF', 'AST_TOV', 'STL_TOV']
-        
-        for category in stat_categories:
-            try:
-                logger.info(f"Collecte leaders: {category}")
-                
-                current_year = datetime.now().year
-                current_season = f"{current_year-1}-{str(current_year)[-2:]}"
-                
-                leaders = leagueleaders.LeagueLeaders(
-                    stat_category_abbreviation=category,
-                    season=current_season,
-                    season_type_all_star='Regular Season'
-                )
-                
-                leaders_df = leaders.get_data_frames()[0]
-                leaders_data[category] = leaders_df
+                    logger.info(f"✅ {player['full_name']}: {len(career_df)} saisons collectées")
+                    
+                    # Pause configurable pour éviter la surcharge de l'API
+                    time.sleep(self.config['delay'])
+                    
+                except Exception as e:
+                    logger.warning(f"Erreur joueur {player['full_name']}: {e}")
+                    continue
+            
+            if all_career_stats:
+                # Consolidation de toutes les statistiques de carrière
+                combined_career = pd.concat(all_career_stats, ignore_index=True)
                 
                 # Sauvegarde des données brutes
-                raw_path = f'{self.output_dir}/raw/api_nba/leaders_{category}_{self.metadata["session_id"]}.csv'
-                leaders_df.to_csv(raw_path, index=False)
+                raw_path = f'{self.output_dir}/raw/api_nba/player_career_stats_{self.metadata["session_id"]}.csv'
+                combined_career.to_csv(raw_path, index=False)
                 
-                logger.info(f"✅ Leaders {category}: {len(leaders_df)} joueurs collectés")
+                # Ajout aux métadonnées
+                self.metadata['collected_data']['player_career_stats'] = {
+                    'players_processed': len(all_career_stats),
+                    'total_seasons': len(combined_career),
+                    'raw_file': raw_path,
+                    'columns': list(combined_career.columns)
+                }
                 
-                time.sleep(self.config['delay'])  # Pause configurable
+                logger.info(f"✅ {len(combined_career)} entrées collectées")
+                return combined_career
+            
+            return pd.DataFrame()
+            
+        except Exception as e:
+            error_msg = f"Erreur collecte statistiques de carrière: {e}"
+            logger.error(error_msg)
+            self.metadata['errors'].append(error_msg)
+            return pd.DataFrame()
+    
+    def collect_team_season_stats(self) -> pd.DataFrame:
+        """Collecte des statistiques par saison pour toutes les équipes"""
+        logger.info("Collecte des statistiques par saison des équipes...")
+        
+        try:
+            all_teams = teams.get_teams()
+            all_season_stats = []
+            
+            # Collecte pour les dernières saisons configurées (limite raisonnable pour éviter la surcharge)
+            seasons_to_collect = self.config.get('collection_limits', {}).get('team_season_stats', 10)
+            seasons_to_collect = self.config['seasons'][-seasons_to_collect:]
+            
+            for season in seasons_to_collect:
+                try:
+                    logger.info(f"Collecte saison {season}...")
+                    
+                    season_stats = teamyearbyyearstats.TeamYearByYearStats(
+                        team_id=all_teams[0]['id'],  # Utilise la première équipe comme référence
+                        season_type_all_star='Regular Season'  # Paramètre correct selon l'API
+                    )
+                    
+                    # Récupération des données pour cette saison
+                    season_data = season_stats.get_data_frames()[0]
+                    season_data['SEASON'] = season
+                    all_season_stats.append(season_data)
+                    
+                    logger.info(f"✅ Saison {season}: {len(season_data)} équipes collectées")
+                    time.sleep(self.config['delay'])
+                    
+                except Exception as e:
+                    logger.warning(f"Erreur saison {season}: {e}")
+                    continue
+            
+            if all_season_stats:
+                # Consolidation de toutes les saisons
+                combined_seasons = pd.concat(all_season_stats, ignore_index=True)
                 
-            except Exception as e:
-                error_msg = f"Erreur collecte leaders {category}: {e}"
-                logger.error(error_msg)
-                self.metadata['errors'].append(error_msg)
-                continue
+                # Sauvegarde des données brutes
+                raw_path = f'{self.output_dir}/raw/api_nba/team_season_stats_{self.metadata["session_id"]}.csv'
+                combined_seasons.to_csv(raw_path, index=False)
+                
+                # Ajout aux métadonnées
+                self.metadata['collected_data']['team_season_stats'] = {
+                    'seasons_processed': len(all_season_stats),
+                    'total_entries': len(combined_seasons),
+                    'raw_file': raw_path,
+                    'columns': list(combined_seasons.columns)
+                }
+                
+                logger.info(f"✅ {len(combined_seasons)} entrées collectées")
+                return combined_seasons
+            
+            return pd.DataFrame()
+            
+        except Exception as e:
+            error_msg = f"Erreur collecte statistiques par saison: {e}"
+            logger.error(error_msg)
+            self.metadata['errors'].append(error_msg)
+            return pd.DataFrame()
+    
+    def collect_current_leaders(self) -> Dict[str, pd.DataFrame]:
+        """Collecte des leaders actuels dans différentes catégories"""
+        logger.info("Collecte des leaders actuels...")
         
-        # Sauvegarde de TOUS les leaders dans un seul fichier
-        if leaders_data:
-            all_leaders = pd.concat(leaders_data.values(), ignore_index=True)
-            raw_path = f'{self.output_dir}/raw/api_nba/leaders_ALL_{self.metadata["session_id"]}.csv'
-            all_leaders.to_csv(raw_path, index=False)
-            logger.info(f"✅ Tous les leaders sauvegardés: {raw_path}")
+        try:
+            # Utiliser la configuration pour la saison des leaders
+            if 'leaders_season' in self.config:
+                season_to_use = self.config['leaders_season']
+            else:
+                # Fallback intelligent : utiliser la dernière saison avec des données
+                season_to_use = self.config['seasons'][-1]
+            
+            logger.info(f"Collecte des leaders pour la saison: {season_to_use}")
+            
+            leaders_data = {}
+            
+            for category in self.config['leader_categories']:
+                try:
+                    logger.info(f"Collecte leaders {category}...")
+                    
+                    leaders = leagueleaders.LeagueLeaders(
+                        season=season_to_use,
+                        season_type_all_star='Regular Season'
+                    )
+                    
+                    leaders_df = leaders.get_data_frames()[0]
+                    
+                    # Vérifier que les données ne sont pas vides
+                    if not leaders_df.empty:
+                        leaders_data[category] = leaders_df
+                        logger.info(f"✅ Leaders {category}: {len(leaders_df)} joueurs collectés")
+                    else:
+                        logger.warning(f"Aucun leader trouvé pour {category} en saison {season_to_use}")
+                    
+                    time.sleep(self.config['delay'])  # Pause configurable
+                    
+                except Exception as e:
+                    error_msg = f"Erreur collecte leaders {category}: {e}"
+                    logger.error(error_msg)
+                    self.metadata['errors'].append(error_msg)
+                    continue
+            
+            # Sauvegarde de TOUS les leaders dans un seul fichier
+            if leaders_data:
+                all_leaders = pd.concat(leaders_data.values(), ignore_index=True)
+                raw_path = f'{self.output_dir}/raw/api_nba/leaders_ALL_{self.metadata["session_id"]}.csv'
+                all_leaders.to_csv(raw_path, index=False)
+                logger.info(f"✅ Tous les leaders sauvegardés: {raw_path}")
+            else:
+                logger.warning("Aucun leader collecté - création d'un fichier vide")
+                # Créer un DataFrame vide avec les bonnes colonnes
+                empty_df = pd.DataFrame(columns=['PLAYER_ID', 'RANK', 'PLAYER', 'TEAM_ID', 'TEAM', 'GP', 'MIN', 'FGM', 'FGA', 'FG_PCT', 'FG3M', 'FG3A', 'FG3_PCT', 'FTM', 'FTA', 'FT_PCT', 'OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TOV', 'PF', 'PTS', 'EFF', 'AST_TOV', 'STL_TOV'])
+                raw_path = f'{self.output_dir}/raw/api_nba/leaders_ALL_{self.metadata["session_id"]}.csv'
+                empty_df.to_csv(raw_path, index=False)
+            
+            # Ajout aux métadonnées
+            self.metadata['collected_data']['current_leaders'] = {
+                'categories_processed': len(leaders_data),
+                'total_players': sum(len(df) for df in leaders_data.values()),
+                'total_file': raw_path,
+                'season_used': season_to_use
+            }
+            
+            return leaders_data
         
-        # Ajout aux métadonnées
-        self.metadata['collected_data']['current_leaders'] = {
-            'categories_processed': len(leaders_data),
-            'total_players': sum(len(df) for df in leaders_data.values()),
-            'total_file': raw_path if leaders_data else None
-        }
+        except Exception as e:
+            error_msg = f"Erreur collecte leaders: {e}"
+            logger.error(error_msg)
+            self.metadata['errors'].append(error_msg)
+            return {}
+    
+    def collect_player_traditional_stats(self) -> pd.DataFrame:
+        """Collecte des statistiques traditionnelles des joueurs via NBA Stats API"""
+        if not self.config.get('advanced_stats', {}).get('player_traditional', {}).get('enabled', False):
+            logger.info("Statistiques traditionnelles des joueurs désactivées dans la configuration")
+            return pd.DataFrame()
         
-        return leaders_data
+        logger.info("Collecte des statistiques traditionnelles des joueurs...")
+        
+        try:
+            config = self.config['advanced_stats']['player_traditional']
+            
+            # Récupérer d'abord les informations des joueurs pour enrichir les données
+            all_players = players.get_players()
+            players_dict = {p['id']: p['full_name'] for p in all_players}
+            
+            # Récupération des statistiques pour TOUTES les saisons depuis 2000
+            # Suppression de la limitation artificielle seasons_to_collect
+            seasons_to_collect = self.config['seasons']  # Depuis 2000
+            all_stats = []
+            
+            logger.info(f"Collecte des stats traditionnelles pour {len(seasons_to_collect)} saisons depuis {seasons_to_collect[0]}")
+            
+            for season in seasons_to_collect:
+                try:
+                    logger.info(f"Collecte stats traditionnelles saison {season}...")
+                    
+                    # Utilisation de leaguedashplayerstats pour les stats league-wide
+                    stats = leaguedashplayerstats.LeagueDashPlayerStats(
+                        season=f"{season}-{str(season + 1)[-2:]}",
+                        measure_type_detailed_defense=config['measure_type'],
+                        per_mode_detailed=config['per_mode'],
+                        season_type_all_star=config['season_type']
+                    )
+                    
+                    stats_df = stats.get_data_frames()[0]
+                    
+                    # Enrichir les données avec les noms des joueurs
+                    if not stats_df.empty:
+                        # Ajouter le nom du joueur depuis les données statiques
+                        stats_df['PLAYER_NAME_ENRICHED'] = stats_df['PLAYER_ID'].map(players_dict)
+                        
+                        # Si PLAYER_NAME est vide, utiliser PLAYER_NAME_ENRICHED
+                        if 'PLAYER_NAME' in stats_df.columns:
+                            stats_df['PLAYER_NAME'] = stats_df['PLAYER_NAME'].fillna(stats_df['PLAYER_NAME_ENRICHED'])
+                        else:
+                            stats_df['PLAYER_NAME'] = stats_df['PLAYER_NAME_ENRICHED']
+                        
+                        # Supprimer la colonne temporaire
+                        stats_df = stats_df.drop('PLAYER_NAME_ENRICHED', axis=1)
+                        
+                        stats_df['SEASON'] = season
+                        all_stats.append(stats_df)
+                        
+                        logger.info(f"✅ Saison {season}: {len(stats_df)} joueurs collectés")
+                    else:
+                        logger.warning(f"Aucune donnée trouvée pour la saison {season}")
+                    
+                    time.sleep(self.config['delay'])
+                    
+                except Exception as e:
+                    logger.warning(f"Erreur saison {season}: {e}")
+                    continue
+            
+            if all_stats:
+                # Consolidation de toutes les saisons
+                combined_stats = pd.concat(all_stats, ignore_index=True)
+                
+                # Sauvegarde des données brutes
+                raw_path = f'{self.output_dir}/raw/api_nba/player_traditional_stats_{self.metadata["session_id"]}.csv'
+                combined_stats.to_csv(raw_path, index=False)
+                
+                # Ajout aux métadonnées
+                self.metadata['collected_data']['player_traditional_stats'] = {
+                    'seasons_processed': len(all_stats),
+                    'total_players': len(combined_stats),
+                    'raw_file': raw_path,
+                    'columns': list(combined_stats.columns),
+                    'seasons_range': f"{seasons_to_collect[0]} - {seasons_to_collect[-1]}"
+                }
+                
+                logger.info(f"✅ {len(combined_stats)} entrées collectées sur {len(all_stats)} saisons")
+                return combined_stats
+            
+            return pd.DataFrame()
+            
+        except Exception as e:
+            error_msg = f"Erreur collecte statistiques traditionnelles: {e}"
+            logger.error(error_msg)
+            self.metadata['errors'].append(error_msg)
+            return pd.DataFrame()
+    
+    def collect_player_clutch_stats(self) -> pd.DataFrame:
+        """Collecte des statistiques en situation de clutch des joueurs via NBA Stats API"""
+        if not self.config.get('advanced_stats', {}).get('player_clutch', {}).get('enabled', False):
+            logger.info("Statistiques clutch des joueurs désactivées dans la configuration")
+            return pd.DataFrame()
+        
+        logger.info("Collecte des statistiques clutch des joueurs...")
+        
+        try:
+            config = self.config['advanced_stats']['player_clutch']
+            
+            # Récupérer d'abord les informations des joueurs pour enrichir les données
+            all_players = players.get_players()
+            players_dict = {p['id']: p['full_name'] for p in all_players}
+            
+            # Récupération des statistiques clutch pour TOUTES les saisons depuis 2000
+            # Suppression de la limitation artificielle seasons_to_collect
+            seasons_to_collect = self.config['seasons']  # Depuis 2000
+            all_clutch_stats = []
+            
+            logger.info(f"Collecte des stats clutch pour {len(seasons_to_collect)} saisons depuis {seasons_to_collect[0]}")
+            
+            for season in seasons_to_collect:
+                try:
+                    logger.info(f"Collecte stats clutch saison {season}...")
+                    
+                    # Utilisation de leaguedashplayerclutch pour les stats clutch league-wide
+                    clutch_stats = leaguedashplayerclutch.LeagueDashPlayerClutch(
+                        season=f"{season}-{str(season + 1)[-2:]}",
+                        measure_type_detailed_defense=config['measure_type'],
+                        per_mode_detailed=config['per_mode'],
+                        season_type_all_star=config['season_type'],
+                        clutch_time=config['clutch_time'],
+                        ahead_behind=config['ahead_behind']
+                    )
+                    
+                    clutch_df = clutch_stats.get_data_frames()[0]
+                    
+                    # Enrichir les données avec les noms des joueurs
+                    if not clutch_df.empty:
+                        # Ajouter le nom du joueur depuis les données statiques
+                        clutch_df['PLAYER_NAME_ENRICHED'] = clutch_df['PLAYER_ID'].map(players_dict)
+                        
+                        # Si PLAYER_NAME est vide, utiliser PLAYER_NAME_ENRICHED
+                        if 'PLAYER_NAME' in clutch_df.columns:
+                            clutch_df['PLAYER_NAME'] = clutch_df['PLAYER_NAME'].fillna(clutch_df['PLAYER_NAME_ENRICHED'])
+                        else:
+                            clutch_df['PLAYER_NAME'] = clutch_df['PLAYER_NAME_ENRICHED']
+                        
+                        # Supprimer la colonne temporaire
+                        clutch_df = clutch_df.drop('PLAYER_NAME_ENRICHED', axis=1)
+                        
+                        clutch_df['SEASON'] = season
+                        clutch_df['CLUTCH_TIME'] = config['clutch_time']
+                        clutch_df['AHEAD_BEHIND'] = config['ahead_behind']
+                        all_clutch_stats.append(clutch_df)
+                        
+                        logger.info(f"✅ Saison {season}: {len(clutch_df)} joueurs clutch collectés")
+                    else:
+                        logger.warning(f"Aucune donnée clutch trouvée pour la saison {season}")
+                    
+                    time.sleep(self.config['delay'])
+                    
+                except Exception as e:
+                    logger.warning(f"Erreur clutch saison {season}: {e}")
+                    continue
+            
+            if all_clutch_stats:
+                # Consolidation de toutes les saisons
+                combined_clutch = pd.concat(all_clutch_stats, ignore_index=True)
+                
+                # Sauvegarde des données brutes
+                raw_path = f'{self.output_dir}/raw/api_nba/player_clutch_stats_{self.metadata["session_id"]}.csv'
+                combined_clutch.to_csv(raw_path, index=False)
+                
+                # Ajout aux métadonnées
+                self.metadata['collected_data']['player_clutch_stats'] = {
+                    'seasons_processed': len(all_clutch_stats),
+                    'total_players': len(combined_clutch),
+                    'raw_file': raw_path,
+                    'columns': list(combined_clutch.columns),
+                    'seasons_range': f"{seasons_to_collect[0]} - {seasons_to_collect[-1]}"
+                }
+                
+                logger.info(f"✅ {len(combined_clutch)} entrées collectées sur {len(all_clutch_stats)} saisons")
+                return combined_clutch
+            
+            return pd.DataFrame()
+            
+        except Exception as e:
+            error_msg = f"Erreur collecte statistiques clutch: {e}"
+            logger.error(error_msg)
+            self.metadata['errors'].append(error_msg)
+            return pd.DataFrame()
+    
+    def collect_team_traditional_stats(self) -> pd.DataFrame:
+        """Collecte des statistiques traditionnelles des équipes via NBA Stats API"""
+        if not self.config.get('advanced_stats', {}).get('team_traditional', {}).get('enabled', False):
+            logger.info("Statistiques traditionnelles des équipes désactivées dans la configuration")
+            return pd.DataFrame()
+        
+        logger.info("Collecte des statistiques traditionnelles des équipes...")
+        
+        try:
+            config = self.config['advanced_stats']['team_traditional']
+            
+            # Récupération des statistiques pour TOUTES les saisons depuis 2000
+            # Suppression de la limitation artificielle seasons_to_collect
+            seasons_to_collect = self.config['seasons']  # Depuis 2000
+            all_team_stats = []
+            
+            logger.info(f"Collecte des stats équipes pour {len(seasons_to_collect)} saisons depuis {seasons_to_collect[0]}")
+            
+            for season in seasons_to_collect:
+                try:
+                    logger.info(f"Collecte équipes saison {season}...")
+                    
+                    # Utilisation de leaguedashteamstats pour les stats d'équipes
+                    team_stats = leaguedashteamstats.LeagueDashTeamStats(
+                        season=f"{season}-{str(season + 1)[-2:]}",
+                        measure_type_detailed_defense=config['measure_type'],
+                        per_mode_detailed=config['per_mode'],
+                        season_type_all_star=config['season_type']
+                    )
+                    
+                    team_df = team_stats.get_data_frames()[0]
+                    team_df['SEASON'] = season
+                    all_team_stats.append(team_df)
+                    
+                    logger.info(f"✅ Équipes saison {season}: {len(team_df)} équipes collectées")
+                    time.sleep(self.config['delay'])
+                    
+                except Exception as e:
+                    logger.warning(f"Erreur équipes saison {season}: {e}")
+                    continue
+            
+            if all_team_stats:
+                # Consolidation de toutes les saisons
+                combined_teams = pd.concat(all_team_stats, ignore_index=True)
+                
+                # Sauvegarde des données brutes
+                raw_path = f'{self.output_dir}/raw/api_nba/team_traditional_stats_{self.metadata["session_id"]}.csv'
+                combined_teams.to_csv(raw_path, index=False)
+                
+                # Ajout aux métadonnées
+                self.metadata['collected_data']['team_traditional_stats'] = {
+                    'seasons_processed': len(all_team_stats),
+                    'total_teams': len(combined_teams),
+                    'raw_file': raw_path,
+                    'columns': list(combined_teams.columns),
+                    'seasons_range': f"{seasons_to_collect[0]} - {seasons_to_collect[-1]}"
+                }
+                
+                logger.info(f"✅ {len(combined_teams)} entrées collectées sur {len(all_team_stats)} saisons")
+                return combined_teams
+            
+            return pd.DataFrame()
+            
+        except Exception as e:
+            error_msg = f"Erreur collecte statistiques équipes: {e}"
+            logger.error(error_msg)
+            self.metadata['errors'].append(error_msg)
+            return pd.DataFrame()
     
     def save_metadata(self):
         """Sauvegarde des métadonnées de la session"""
@@ -324,7 +593,7 @@ class NBADataCollector:
     def run_full_collection(self) -> Dict:
         """Exécute la collecte complète des données NBA (limite configurable)"""
         max_players = self.config['max_players']
-        logger.info(f"🚀 Démarrage de la collecte complète des données NBA (limite: {max_players} joueurs actifs)")
+        logger.info(f"Démarrage de la collecte complète des données NBA (limite: {max_players} joueurs actifs)")
         
         try:
             # Collecte des données statiques
@@ -336,6 +605,11 @@ class NBADataCollector:
             team_season = self.collect_team_season_stats()
             current_leaders = self.collect_current_leaders()
             
+            # Nouvelles collectes de statistiques avancées
+            player_traditional = self.collect_player_traditional_stats()
+            player_clutch = self.collect_player_clutch_stats()
+            team_traditional = self.collect_team_traditional_stats()
+            
             # Sauvegarde des métadonnées
             metadata_path = self.save_metadata()
             
@@ -346,7 +620,7 @@ class NBADataCollector:
                 metadata_manager.update_all_metadata()
                 logger.info("✅ Index et métadonnées globales mis à jour")
             except Exception as e:
-                logger.warning(f"⚠️ Erreur mise à jour métadonnées globales: {e}")
+                logger.warning(f"Erreur mise à jour métadonnées globales: {e}")
             
             # Résumé de la collecte
             summary = {
@@ -356,12 +630,15 @@ class NBADataCollector:
                 'player_careers': len(player_career),
                 'team_seasons': len(team_season),
                 'leader_categories': len(current_leaders),
+                'player_traditional_stats': len(player_traditional),
+                'player_clutch_stats': len(player_clutch),
+                'team_traditional_stats': len(team_traditional),
                 'errors_count': len(self.metadata['errors']),
                 'metadata_file': metadata_path
             }
             
             logger.info("✅ Collecte complète terminée avec succès")
-            logger.info(f"📊 Résumé: {summary}")
+            logger.info(f"Résumé: {summary}")
             
             return summary
             
@@ -371,5 +648,3 @@ class NBADataCollector:
             self.metadata['errors'].append(error_msg)
             self.save_metadata()
             raise
-
-

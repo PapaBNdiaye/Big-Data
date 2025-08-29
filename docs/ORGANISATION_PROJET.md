@@ -1,4 +1,4 @@
-# 🏀 NBA DataLake - Organisation du Projet
+# NBA DataLake - Organisation du Projet
 
 ## 📁 Structure du Projet
 
@@ -26,7 +26,7 @@ tp_group/
 └── venv/                     # Environnement virtuel (ignoré par Git)
 ```
 
-## 🎯 Principes d'Organisation
+## Principes d'Organisation
 
 ### **1. Séparation des Responsabilités**
 - **`src/`** : Code source et logique métier
@@ -46,7 +46,7 @@ tp_group/
 - **Insight** : Analyse et visualisation
 - **Métadonnées** : Traçabilité et index des données
 
-## 🔧 Configuration
+## Configuration
 
 ### **Fichier `config.py`**
 - **Chemins** : Définition centralisée des dossiers
@@ -68,7 +68,7 @@ KAGGLE_USERNAME=your_username
 KAGGLE_KEY=your_key
 ```
 
-## 📊 Gestion des Données
+## Gestion des Données
 
 ### **Données Ignorées par Git**
 - **`data/raw/`** : Données brutes (CSV, JSON, SQLite)
@@ -83,7 +83,7 @@ KAGGLE_KEY=your_key
 - **Documentation** : Guides et explications
 - **Métadonnées** : Index et descriptions
 
-## 🚀 Workflow de Développement
+## Workflow de Développement
 
 ### **1. Configuration Initiale**
 ```bash
@@ -151,7 +151,7 @@ python src/main.py
 - **Erreurs** : Analyse des logs
 - **Qualité** : Validation des données
 
-## 📚 Ressources
+## Ressources
 
 - **README.md** : Vue d'ensemble du projet
 - **`docs/`** : Documentation détaillée
