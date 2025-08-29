@@ -1,194 +1,130 @@
 # Organisation des Données - NBA DataLake
 
-## Vue d'ensemble
-
-Ce dossier contient toutes les données collectées, organisées selon l'architecture DataLake. La structure respecte les bonnes pratiques de séparation des données brutes, traitées et des métadonnées.
-
 ## Structure des dossiers
 
 ```
 data/
-├── raw/                    # Données brutes non transformées
-│   ├── api_nba/           # Données NBA API officielle
-│   └── kaggle/            # Dataset Kaggle basketball
+├── raw/                    # Données brutes
+│   ├── api_nba/           # Données collectées via l'API NBA
+│   │   ├── player_career_stats/
+│   │   ├── team_year_by_year_stats/
+│   │   ├── league_leaders/
+│   │   ├── player_traditional_stats/
+│   │   ├── player_clutch_stats/
+│   │   └── team_traditional_stats/
+│   └── kaggle/            # Dataset basketball Kaggle
+│       ├── *.csv          # Fichiers CSV du dataset
+│       └── metadata/      # Métadonnées spécifiques Kaggle
 ├── processed/              # Données traitées et transformées
-├── metadata/               # Métadonnées et index
-└── ORGANISATION_DONNEES.md # Ce fichier
+│   ├── fusion/            # Données fusionnées API + Kaggle
+│   └── analytics/         # Données d'analyse
+└── metadata/               # Métadonnées globales et index
+    ├── metadata_globale.json
+    ├── index_donnees.json
+    └── sessions/           # Métadonnées par session
 ```
 
-## Détail des dossiers
+## Sources de données
 
-### 1. `raw/` - Données brutes
-
-#### `raw/api_nba/` - Données NBA API
-**Source** : API officielle NBA via `nba_api`
-
-**Fichiers disponibles (Session 20250829_010804) :**
-- `players_static_20250829_010804.csv` (202,239 bytes)
-  - Informations statiques de tous les joueurs
-  - Colonnes : id, full_name, abbreviation, nickname, city, state, year_founded
-  
-- `teams_static_20250829_010804.csv` (1,998 bytes)
-  - Informations statiques de toutes les équipes
-  - Colonnes : id, full_name, abbreviation, nickname, city, state, year_founded
-  
-- `player_career_stats_20250829_010804.csv` (4,830 bytes)
-  - Statistiques de carrière pour 5 joueurs actifs
-  - Colonnes : PLAYER_ID, PLAYER_NAME, SEASON_ID, TEAM_ID, TEAM_ABBREVIATION, etc.
-  
-- `team_season_stats_20250829_010804.csv` (116,868 bytes)
-  - Statistiques par saison pour les équipes
-  - Colonnes : TEAM_ID, TEAM_NAME, SEASON, W, L, W_PCT, etc.
-  
-- `leaders_ALL_20250829_010804.csv` (941,985 bytes)
-  - Leaders actuels dans toutes les catégories
-  - Colonnes : PLAYER_ID, RANK, PLAYER, TEAM_ID, TEAM, GP, MIN, PTS, etc.
-  
-- `player_traditional_stats_20250829_010804.csv` (8,906,993 bytes)
-  - Statistiques traditionnelles des joueurs (2000-2025)
-  - Colonnes : PLAYER_ID, PLAYER_NAME, TEAM_ID, SEASON, GP, MIN, PTS, REB, AST, etc.
-  
-- `player_clutch_stats_20250829_010804.csv` (7,478,592 bytes)
-  - Statistiques en situation de clutch (2000-2025)
-  - Colonnes : PLAYER_ID, PLAYER_NAME, TEAM_ID, SEASON, CLUTCH_TIME, AHEAD_BEHIND, etc.
-  
-- `team_traditional_stats_20250829_010804.csv` (430,141 bytes)
-  - Statistiques traditionnelles des équipes (2000-2025)
-  - Colonnes : TEAM_ID, TEAM_NAME, SEASON, GP, W, L, W_PCT, etc.
-
-#### `raw/kaggle/` - Dataset Kaggle
-**Source** : Dataset "basketball" de Kaggle
-
-**Fichiers prévus :**
-- `players.csv` - Informations des joueurs
-- `teams.csv` - Informations des équipes
-- `games.csv` - Détails des matchs
-- `games_details.csv` - Statistiques détaillées des matchs
-- `ranking.csv` - Classements des équipes
-
-**Note** : Ce dossier est préparé pour l'intégration future du dataset Kaggle.
-
-### 2. `processed/` - Données traitées
-
-**Contenu** : Données transformées, nettoyées et prêtes pour l'analyse
-
-**Utilisation** : 
-- Données fusionnées (API NBA + Kaggle)
-- Données agrégées et calculées
-- Données formatées pour le dashboard
-
-### 3. `metadata/` - Métadonnées et index
-
-**Contenu** : Informations de traçabilité et index des données
-
-**Fichiers** :
-- `session_*.json` - Métadonnées de chaque session de collecte
-- `index_donnees.json` - Index global de toutes les données
-- `metadata_globale.json` - Métadonnées consolidées
-
-## Couverture temporelle
-
-### API NBA
+### API NBA (data/raw/api_nba/)
+- **Collecteur** : `nba_data_collector.py`
 - **Période** : 2000-2025 (26 saisons)
-- **Fréquence** : Mise à jour à la demande
-- **Complétude** : 100% des saisons configurées
+- **Types** : Statistiques joueurs, équipes, leaders, traditionnelles, clutch
+- **Format** : CSV avec métadonnées enrichies
+- **Volume** : ~18.2 MB par session complète
 
-### Dataset Kaggle
-- **Période** : 1946-2023 (77 saisons)
-- **Fréquence** : Mise à jour manuelle
-- **Complétude** : Données historiques complètes
+### Dataset Kaggle (data/raw/kaggle/)
+- **Intégrateur** : `kaggle_integrator.py`
+- **Source** : wyattowalsh/basketball
+- **Contenu** : Données historiques NBA
+- **Format** : CSV natif
+- **Intégration** : Automatique via kagglehub
+
+## Gestion des métadonnées
+
+### Métadonnées globales
+- **Fichier** : `data/metadata/metadata_globale.json`
+- **Contenu** : Configuration, paramètres, statistiques globales
+- **Mise à jour** : Automatique après chaque session
+
+### Index des données
+- **Fichier** : `data/metadata/index_donnees.json`
+- **Contenu** : Inventaire complet des fichiers et leurs métadonnées
+- **Mise à jour** : Automatique après chaque collecte
+
+### Métadonnées de session
+- **Dossier** : `data/metadata/sessions/`
+- **Format** : `{type}_session_{timestamp}.json`
+- **Contenu** : Détails de chaque session de collecte
+
+## Flux de données
+
+1. **Collecte API NBA** → `data/raw/api_nba/`
+2. **Intégration Kaggle** → `data/raw/kaggle/`
+3. **Génération métadonnées** → `data/metadata/`
+4. **Traitement** → `data/processed/`
+5. **Validation** → Logs et rapports
 
 ## Qualité des données
 
 ### Validation automatique
-- **Vérification des colonnes** : Présence et cohérence
-- **Détection des valeurs manquantes** : Identification des anomalies
-- **Validation des types** : Vérification des formats
-- **Enrichissement automatique** : Ajout des noms de joueurs
+- **Complétude** : Vérification des valeurs manquantes
+- **Cohérence** : Validation des types de données
+- **Intégrité** : Vérification des relations entre fichiers
 
-### Métriques de qualité
-- **Taux de complétude** : >95% pour les données principales
-- **Cohérence temporelle** : Saisons continues depuis 2000
-- **Traçabilité** : Métadonnées complètes pour chaque session
+### Enrichissement
+- **Noms des joueurs** : Complétion automatique des PLAYER_NAME
+- **Métadonnées** : Ajout de timestamps et sources
+- **Index** : Création automatique des index de recherche
 
-## Gestion des versions
-
-### Stratégie de versioning
-- **Session-based** : Chaque collecte crée une nouvelle session
-- **Timestamp unique** : Identifiant unique pour chaque session
-- **Conservation** : Toutes les sessions sont conservées
-- **Index global** : Mise à jour automatique de l'inventaire
+## Maintenance
 
 ### Nettoyage automatique
-- **Logs** : Rotation automatique des logs anciens
-- **Métadonnées** : Conservation de toutes les sessions
-- **Données** : Conservation de toutes les collectes
+- **Logs** : Rotation automatique des fichiers de log
+- **Métadonnées** : Archivage des anciennes sessions
+- **Données temporaires** : Suppression automatique
 
-## Utilisation des données
+### Sauvegarde
+- **Structure** : Préservation de l'organisation des dossiers
+- **Métadonnées** : Sauvegarde des index et configurations
+- **Données** : Protection contre la corruption
 
-### Accès direct
+## Utilisation
+
+### Accès aux données
 ```python
-import pandas as pd
+# Données API NBA
+api_data_path = "data/raw/api_nba/"
 
-# Lire les données des joueurs
-players_df = pd.read_csv('data/raw/api_nba/players_static_20250829_010804.csv')
+# Données Kaggle
+kaggle_data_path = "data/raw/kaggle/"
 
-# Lire les stats traditionnelles
-stats_df = pd.read_csv('data/raw/api_nba/player_traditional_stats_20250829_010804.csv')
-
-# Filtrer par saison
-stats_2020 = stats_df[stats_df['SEASON'] == 2020]
+# Métadonnées
+metadata_path = "data/metadata/"
 ```
 
-### Via l'API du projet
+### Consultation des métadonnées
 ```python
-from src.ingestion.nba_data_collector import NBADataCollector
+import json
 
-collector = NBADataCollector()
-# Les données sont automatiquement organisées dans la structure DataLake
+# Métadonnées globales
+with open("data/metadata/metadata_globale.json", "r") as f:
+    global_metadata = json.load(f)
+
+# Index des données
+with open("data/metadata/index_donnees.json", "r") as f:
+    data_index = json.load(f)
 ```
-
-## Maintenance et surveillance
-
-### Espace disque
-- **Surveillance** : Vérification régulière de l'espace disponible
-- **Nettoyage** : Suppression des fichiers temporaires
-- **Archivage** : Compression des anciennes sessions si nécessaire
-
-### Intégrité des données
-- **Validation** : Vérification de la cohérence des métadonnées
-- **Backup** : Sauvegarde des données critiques
-- **Restauration** : Procédures de récupération en cas de problème
-
-### Performance
-- **Index** : Optimisation des requêtes via l'index global
-- **Cache** : Mise en cache des données fréquemment utilisées
-- **Compression** : Compression des données historiques
 
 ## Bonnes pratiques
 
-### Pour les développeurs
-- Toujours utiliser les chemins relatifs depuis la racine du projet
-- Respecter la structure des dossiers existante
-- Ajouter des métadonnées pour les nouvelles données
-- Valider la qualité avant de sauvegarder
+1. **Ne jamais modifier manuellement** la structure des dossiers
+2. **Utiliser les outils** de collecte et d'intégration
+3. **Consulter les métadonnées** avant d'accéder aux données
+4. **Respecter la séparation** raw/processed/metadata
+5. **Valider la qualité** des données avant traitement
 
-### Pour les utilisateurs
-- Consulter l'index des données avant utilisation
-- Vérifier la date de dernière collecte
-- Utiliser les métadonnées pour comprendre le contexte
-- Signaler les anomalies détectées
+---
 
-## Support et dépannage
-
-### Problèmes courants
-- **Fichiers manquants** : Vérifier l'index des données
-- **Données corrompues** : Consulter les logs de collecte
-- **Espace disque** : Nettoyer les fichiers temporaires
-- **Métadonnées incohérentes** : Relancer la mise à jour des métadonnées
-
-### Ressources utiles
-- `CLEANUP_SUMMARY.md` : Résumé du nettoyage effectué
-- `src/ingestion/README.md` : Documentation du module d'ingestion
-- Logs dans `data/ingestion.log`
-- Métadonnées dans `data/metadata/`
+**Dernière mise à jour** : Intégration Kaggle fonctionnelle
+**Statut** : Production ready

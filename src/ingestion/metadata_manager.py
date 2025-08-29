@@ -163,10 +163,68 @@ class MetadataManager:
         
         return consolidated_metadata
     
-    def update_all_metadata(self):
+    def update_global_metadata(self) -> Dict[str, Any]:
+        """Met à jour les métadonnées globales consolidées"""
+        try:
+            print("Mise à jour des métadonnées globales...")
+            
+            # Consolidation des métadonnées de session
+            consolidated_metadata = self.consolidate_session_metadata()
+            
+            # Sauvegarde des métadonnées consolidées
+            metadata_path = f'{self.metadata_dir}/metadata_globale.json'
+            with open(metadata_path, 'w', encoding='utf-8') as f:
+                json.dump(consolidated_metadata, f, indent=2, ensure_ascii=False)
+            
+            print(f"✅ Métadonnées globales mises à jour: {metadata_path}")
+            
+            return {
+                'success': True,
+                'metadata_path': metadata_path,
+                'summary': consolidated_metadata
+            }
+            
+        except Exception as e:
+            error_msg = f"Erreur mise à jour métadonnées globales: {e}"
+            print(f"❌ {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg
+            }
+    
+    def update_data_index(self) -> Dict[str, Any]:
+        """Met à jour l'index global des données"""
+        try:
+            print("Mise à jour de l'index des données...")
+            
+            # Création de l'index
+            data_index = self.create_data_index()
+            
+            # Sauvegarde de l'index
+            index_path = f'{self.metadata_dir}/index_donnees.json'
+            with open(index_path, 'w', encoding='utf-8') as f:
+                json.dump(data_index, f, indent=2, ensure_ascii=False)
+            
+            print(f"✅ Index des données mis à jour: {index_path}")
+            
+            return {
+                'success': True,
+                'index_path': index_path,
+                'summary': data_index
+            }
+            
+        except Exception as e:
+            error_msg = f"Erreur mise à jour index des données: {e}"
+            print(f"❌ {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg
+            }
+    
+    def update_all_metadata(self) -> Dict[str, Any]:
         """Mise à jour complète de toutes les métadonnées et index"""
         try:
-            print("Mise à jour des métadonnées et index...")
+            print("🔄 Mise à jour complète des métadonnées et index...")
             
             # Mise à jour des métadonnées globales
             metadata_result = self.update_global_metadata()
@@ -174,13 +232,22 @@ class MetadataManager:
             # Mise à jour de l'index des données
             index_result = self.update_data_index()
             
-            print(f"\nMise à jour terminée avec succès!")
+            # Résumé de la mise à jour
+            summary = {
+                'total_files': index_result['summary']['total_files'] if index_result['success'] else 0,
+                'total_size_mb': index_result['summary']['total_size_mb'] if index_result['success'] else 0,
+                'categories': index_result['summary']['categories'] if index_result['success'] else {}
+            }
+            
+            print(f"\n✅ Mise à jour terminée avec succès!")
             print(f"  - Métadonnées: {'✅' if metadata_result['success'] else '❌'}")
             print(f"  - Index: {'✅' if index_result['success'] else '❌'}")
             
             return {
-                'metadata': metadata_result,
-                'index': index_result
+                'success': True,
+                'metadata_path': metadata_result.get('metadata_path'),
+                'index_path': index_result.get('index_path'),
+                'summary': summary
             }
             
         except Exception as e:
