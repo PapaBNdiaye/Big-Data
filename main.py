@@ -238,6 +238,41 @@ def process_and_write(df, name, target_path, tmp_dir, spark):
         except Exception:
             pass
 
+def csv_hdfs_to_duckdb(csv_hdfs_path, duckdb_hdfs_path, table_name="data"):
+    """
+    Télécharge un CSV depuis HDFS, le convertit en DuckDB, puis upload le .duckdb dans HDFS.
+    Affiche un message si le CSV n'existe pas.
+    """
+    import pandas as pd
+    if not hdfs_path_exists(csv_hdfs_path):
+        print(f"ERREUR : Fichier CSV absent dans HDFS : {csv_hdfs_path}")
+        return
+    local_csv = tempfile.mktemp(prefix="csvtmp_", suffix=".csv")
+    local_duckdb = tempfile.mktemp(prefix="duckdbtmp_", suffix=".duckdb")
+    try:
+        print(f"Téléchargement du CSV depuis HDFS : {csv_hdfs_path}")
+        client.download(csv_hdfs_path, local_csv, overwrite=True)
+        print(f"Lecture du CSV en pandas...")
+        df = pd.read_csv(local_csv)
+        print(f"Conversion en DuckDB : {local_duckdb}")
+        con = duckdb.connect(local_duckdb)
+        con.execute(f"CREATE TABLE {table_name} AS SELECT * FROM df")
+        con.close()
+        print(f"Upload du DuckDB dans HDFS : {duckdb_hdfs_path}")
+        client.upload(duckdb_hdfs_path, local_duckdb, overwrite=True)
+        print(f"Fichier DuckDB disponible dans HDFS : {duckdb_hdfs_path}")
+    except Exception as e:
+        print(f"ERREUR conversion CSV->DuckDB : {e}")
+    finally:
+        try:
+            os.remove(local_csv)
+        except Exception:
+            pass
+        try:
+            os.remove(local_duckdb)
+        except Exception:
+            pass
+
 def main():
     spark = SparkSession.builder.appName("NBACSVSingleFile_v4").getOrCreate()
     try:
@@ -306,3 +341,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # Conversion des CSV générés en DuckDB dans HDFS
+    csv_hdfs_to_duckdb("/data_processed/career_stats_clean.csv", "/data_processed/career_stats_clean.duckdb", table_name="career_stats")
+    csv_hdfs_to_duckdb("/data_processed/spectacular_games.csv", "/data_processed/spectacular_games.duckdb", table_name="spectacular_games")

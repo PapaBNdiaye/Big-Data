@@ -217,6 +217,50 @@ NBA_API_CONFIG = {
 - **Surveillance des logs** : Identifier les patterns d'erreur
 - **Backup des données** : Sauvegarde avant nouvelles collectes
 
+## Utilisation du pipeline Spark & DuckDB
+
+### 1. Ingestion des données dans HDFS
+
+Avant de lancer le traitement, il faut créer les dossiers nécessaires dans HDFS puis déposer les fichiers CSV bruts :
+
+```bash
+# Depuis le container namenode, créer les dossiers dans HDFS
+hdfs dfs -mkdir -p /data_raw/nba_api
+hdfs dfs -mkdir -p /data_raw/kaggle
+
+# Importer les fichiers bruts dans HDFS
+hdfs dfs -put /root/player_career_stats_..._....csv /data_raw/nba_api
+hdfs dfs -put /root/games.csv /data_raw/kaggle
+```
+Adaptez les chemins selon vos fichiers sources.
+
+### 2. Lancer le traitement Spark
+
+Utilisez Docker Compose pour construire et lancer le service de traitement :
+
+```bash
+docker-compose build datalake-app
+docker-compose up -d datalake-app
+```
+
+Le script `main.py` va :
+- Lire les fichiers CSV depuis `/data_raw` dans HDFS
+- Nettoyer et transformer les données (statistiques joueurs, matchs)
+- Calculer les variations de performance
+- Générer les fichiers traités au format CSV et DuckDB dans `/data_processed` sur HDFS
+
+### 3. Stockage des fichiers traités
+
+Les fichiers traités sont stockés dans HDFS :
+
+- `/data_processed/career_stats_clean.csv`
+- `/data_processed/spectacular_games.csv`
+- `/data_processed/career_stats_clean.duckdb`
+- `/data_processed/spectacular_games.duckdb`
+
+**Remarque :**
+Ce sont les fichiers `.duckdb` qui seront utilisés pour le dashboard et les analyses interactives (requêtes SQL rapides, visualisation).
+
 ## Contribution
 
 Ce projet suit les bonnes pratiques de développement :
